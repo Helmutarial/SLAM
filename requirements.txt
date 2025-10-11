@@ -1,0 +1,6 @@
+# Requirements for collaborative_slam project
+# List all Python packages needed to run the basic scripts
+spectacularai
+depthai
+numpy
+opencv-python
