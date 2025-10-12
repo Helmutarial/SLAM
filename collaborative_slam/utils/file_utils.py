@@ -34,3 +34,15 @@ def prepare_results_folder(input_folder_path, results_root="results"):
     return results_folder
 
 
+def create_results_folders(data_folder):
+    """
+    Create results and cloud_points folders for a given data folder.
+    Returns (results_folder, cloud_points_folder) as absolute paths.
+    """
+    import os
+    input_folder_name = os.path.basename(os.path.normpath(data_folder))
+    results_folder = os.path.join(os.path.dirname(__file__), '..', 'results', input_folder_name)
+    results_folder = os.path.abspath(results_folder)
+    cloud_points_folder = os.path.join(results_folder, 'cloud_points')
+    os.makedirs(cloud_points_folder, exist_ok=True)
+    return results_folder, cloud_points_folder
