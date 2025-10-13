@@ -4,3 +4,4 @@ spectacularai
 depthai
 numpy
 opencv-python
+ultralytics
