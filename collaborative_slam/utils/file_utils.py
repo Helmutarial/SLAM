@@ -1,6 +1,8 @@
 import os
 import argparse
 import sys
+import tkinter as tk
+from tkinter import filedialog
 
 def select_data_folder():
     """
@@ -20,6 +22,16 @@ def select_data_folder():
     except Exception as e:
         print(f"Error al abrir el selector de carpetas: {e}")
         sys.exit(1)
+
+
+def select_video_file():
+    """
+    Abre un diálogo para seleccionar un archivo de vídeo y devuelve la ruta.
+    """
+    root = tk.Tk()
+    root.withdraw()
+    file_path = filedialog.askopenfilename(title='Selecciona el vídeo', filetypes=[('Video files', '*.mp4 *.mkv *.avi')])
+    return file_path
 
 
 def prepare_results_folder(input_folder_path, results_root="results"):

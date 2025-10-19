@@ -277,3 +277,22 @@ def apply_sensor_based_filtering(raw_poses, frame_info, sensor_data, config=None
     print(f"     • Real movement ratio: {frames_moved/len(raw_poses)*100:.1f}%")
     
     return filtered_poses
+
+def load_camera_trajectory(poses_path):
+    """
+    Load camera trajectory from a poses.json file and return Nx2 numpy array.
+    Args:
+        poses_path (str): Path to poses.json
+    Returns:
+        np.ndarray: Nx2 array of [x, y] positions
+    """
+    import os
+    import json
+    import numpy as np
+    if not poses_path or not os.path.exists(poses_path):
+        return None
+    with open(poses_path, 'r') as f:
+        poses = json.load(f)
+    if not poses:
+        return None
+    return np.array([[p['x'], p['y']] for p in poses])
