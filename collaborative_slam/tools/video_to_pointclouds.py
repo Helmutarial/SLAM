@@ -17,7 +17,7 @@ import copy
 import json
 from collaborative_slam.utils import file_utils
 from collaborative_slam.utils.pointcloud_utils import save_pointclouds_and_poses
-from collaborative_slam.views.open3d_visualization_classes import Status, PointCloud, CoordinateFrame, Open3DVisualization
+from collaborative_slam.clases.SlamSceneManager import SlamSceneManager
 from collaborative_slam.views.open3d_visualization_classes import update_camera_frame_from_vio, update_keyframes_from_mapping
 
 
@@ -29,10 +29,14 @@ def main():
     # Select data folder interactively
     dataFolder = file_utils.select_data_folder()
 
-    # Create results and cloud_points folders using utility function
-    results_folder, cloud_points_folder = file_utils.create_results_folders(dataFolder)
+    # Crear carpeta results y cloud_points en la raíz del workspace (TFM)
+    workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+    results_folder = os.path.join(workspace_root, "results")
+    cloud_points_folder = os.path.join(results_folder, "cloud_points")
+    os.makedirs(results_folder, exist_ok=True)
+    os.makedirs(cloud_points_folder, exist_ok=True)
     voxelSize = 0
-    visu3D = Open3DVisualization(voxelSize, False, False, False)
+    visu3D = SlamSceneManager(voxelSize, False, False, False)
 
     print("Starting replay")
     replay = spectacularAI.Replay(dataFolder, onMappingOutput)
