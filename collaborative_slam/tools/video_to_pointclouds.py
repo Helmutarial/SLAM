@@ -18,8 +18,43 @@ import json
 from collaborative_slam.utils import file_utils
 from collaborative_slam.utils.pointcloud_utils import save_pointclouds_and_poses
 from collaborative_slam.clases.SlamSceneManager import SlamSceneManager
-from collaborative_slam.views.open3d_visualization_classes import update_camera_frame_from_vio, update_keyframes_from_mapping
 
+# --- Funciones movidas del archivo eliminado ---
+def update_camera_frame_from_vio(vioOutput, visu3D):
+    """
+    Update the camera frame in the visualization using VIO output.
+    Args:
+        vioOutput: VIO output object with camera pose information.
+        visu3D: SlamSceneManager instance to update.
+    """
+    cameraPose = vioOutput.getCameraPose(0)
+    camToWorld = cameraPose.getCameraToWorldMatrix()
+    visu3D.updateCameraFrame(camToWorld)
+
+def update_keyframes_from_mapping(output, visu3D):
+    """
+    Update keyframes in the visualization using mapping output.
+    Args:
+        output: Mapping output object with updated keyframes.
+        visu3D: SlamSceneManager instance to update.
+    """
+    for frameId in output.updatedKeyFrames:
+        keyFrame = output.map.keyFrames.get(frameId)
+        # Remove deleted key frames from visualisation
+        if not keyFrame:
+            if visu3D.containsKeyFrame(frameId): visu3D.removeKeyFrame(frameId)
+            continue
+        # Check that point cloud exists
+        if not keyFrame.pointCloud: continue
+        # Render key frame point clouds
+        if visu3D.containsKeyFrame(frameId):
+            # Existing key frame
+            visu3D.updateKeyFrame(frameId, keyFrame)
+        else:
+            # New key frame
+            visu3D.addKeyFrame(frameId, keyFrame)
+    if hasattr(output, 'finalMap') and output.finalMap:
+        print("Final map ready!")
 
 def main():
     """
