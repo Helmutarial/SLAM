@@ -80,7 +80,7 @@ def main():
     if detections_3d:
         clustered_detections = cluster_detections_by_class(detections_3d, min_confidence=min_confidence, eps=1.2)
     t0 = time.time()
-    visualize_planview(clean_points, clean_z, clustered_detections, trajectory, class_colors, wall_lines)
+    visualize_planview(clean_points, clean_z, clustered_detections, trajectory, class_colors, wall_lines, detections_3d)
     print(f"Visualización lista en {time.time() - t0:.2f} s")
     print(f"Tiempo total de ejecución: {time.time() - start_total:.2f} s")
 
