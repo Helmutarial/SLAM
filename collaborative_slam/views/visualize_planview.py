@@ -20,12 +20,17 @@ def visualize_planview(clean_points, clean_z, clustered_detections, trajectory, 
     """
     fig, ax = plt.subplots(figsize=(10, 8))
     scatter = ax.scatter(clean_points[:, 0], clean_points[:, 1], s=2, c='gray', alpha=0.2, label='Point cloud')
-    # Dibujar detecciones sin clusterizar
+    # Draw raw detections and projection lines
     if detections_3d:
         for det in detections_3d:
-            if 'closest_point' in det and det['closest_point'] is not None and 'class' in det:
+            if 'closest_point' in det and det['closest_point'] is not None and 'class' in det and det.get('pose') is not None:
                 color = class_colors.get(det['class'], 'red')
                 x, y, _ = det['closest_point']
+                cam_pos = det['pose']
+                cam_x, cam_y = cam_pos['x'], cam_pos['y']
+                # Draw the projection line from camera to closest_point
+                ax.plot([cam_x, x], [cam_y, y], c=color, lw=1.5, alpha=0.5, linestyle='--', label=None)
+                # Draw the detection point
                 ax.scatter(x, y, s=30, c=color, marker='o', alpha=0.7, label=f"{det['class']} (raw)")
 
     # Trayectoria de la cámara

@@ -61,7 +61,10 @@ def main():
             detections = json.load(f)
         with open(poses_json_path, 'r') as f:
             poses = json.load(f)
-        def load_intrinsics(calib_path):
+        def load_intrinsics_and_imu(calib_path):
+            """
+            Load camera intrinsics and IMU-to-camera transformation matrix.
+            """
             with open(calib_path, 'r') as f:
                 calib = json.load(f)
             cam = calib['cameras'][0]
@@ -70,16 +73,63 @@ def main():
                 [0, cam['focalLengthY'], cam['principalPointY']],
                 [0, 0, 1]
             ])
-            return K
+            imu_to_cam = np.array(cam['imuToCamera'])[:3, :3]
+            return K, imu_to_cam
+
         def pixel_to_ray(K, pixel):
+            """
+            Project pixel coordinates to normalized camera ray.
+            """
             x, y = pixel
             invK = np.linalg.inv(K)
             pix_h = np.array([x, y, 1.0])
             ray = invK @ pix_h
             ray = ray / np.linalg.norm(ray)
             return ray
+
+        def load_gyro_orientations(data_jsonl_path):
+            """
+            Load gyroscope orientations for each frame from data.jsonl.
+            Returns a dict: {frame_idx: gyro_vector}
+            """
+            import json
+            gyro_by_time = {}
+            with open(data_jsonl_path, 'r') as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line)
+                        if 'sensor' in entry and entry['sensor']['type'] == 'gyroscope':
+                            time = entry['time']
+                            gyro = entry['sensor']['values']
+                            gyro_by_time[time] = gyro
+                    except Exception:
+                        continue
+            return gyro_by_time
+
+        def get_closest_gyro(frame_time, gyro_by_time):
+            """
+            Find the closest gyro orientation for a given frame time.
+            """
+            times = np.array(list(gyro_by_time.keys()))
+            idx = np.argmin(np.abs(times - frame_time))
+            return gyro_by_time[times[idx]]
+
+        def rotate_ray_with_gyro(ray, gyro, imu_to_cam):
+            """
+            Rotate the camera ray using gyro orientation and imu_to_cam matrix.
+            """
+            # For simplicity, treat gyro as a direction vector (approximation)
+            # In a real scenario, convert gyro to rotation matrix or quaternion
+            # Here, we use the gyro vector as the direction and rotate with imu_to_cam
+            direction = np.array(gyro)
+            direction = direction / np.linalg.norm(direction)
+            rotated_ray = imu_to_cam @ direction
+            rotated_ray = rotated_ray / np.linalg.norm(rotated_ray)
+            return rotated_ray
         matched = match_detections_to_poses(poses, detections)
-        K = load_intrinsics(calib_path)
+        K, imu_to_cam = load_intrinsics_and_imu(calib_path)
+        data_jsonl_path = os.path.join(input_folder, 'data.jsonl')
+        gyro_by_time = load_gyro_orientations(data_jsonl_path) if os.path.exists(data_jsonl_path) else {}
         results = []
         for det in matched:
             if 'pose_index' in det:
@@ -88,10 +138,12 @@ def main():
             if pose is None:
                 det['pose'] = None
                 det['closest_point'] = None
+                det['pose_frame'] = None
                 results.append(det)
                 continue
             frame_idx = pose.get('frame', 0)
             det['pose'] = pose
+            det['pose_frame'] = frame_idx
             cloud_path = os.path.join(cloud_dir, f'{frame_idx}.ply')
             if not os.path.exists(cloud_path):
                 det['closest_point'] = None
@@ -102,13 +154,23 @@ def main():
             if 'centroid' in det:
                 cx, cy = det['centroid']
                 ray = pixel_to_ray(K, (cx, cy))
+                # Get gyro orientation for this frame (approximate by frame_idx)
+                frame_time = None
+                # Try to get time from pose if available
+                if 'time' in pose:
+                    frame_time = pose['time']
+                # If not, use frame_idx as proxy (not exact)
+                if frame_time is None:
+                    frame_time = float(frame_idx)
+                gyro = get_closest_gyro(frame_time, gyro_by_time) if gyro_by_time else np.array([0,0,1])
+                rotated_ray = rotate_ray_with_gyro(ray, gyro, imu_to_cam)
                 cam_pos = np.array([pose['x'], pose['y'], pose['z']])
                 vecs = points - cam_pos
-                cross = np.cross(vecs, ray)
-                dists_to_ray = np.linalg.norm(cross, axis=1) / np.linalg.norm(ray)
+                cross = np.cross(vecs, rotated_ray)
+                dists_to_ray = np.linalg.norm(cross, axis=1) / np.linalg.norm(rotated_ray)
                 idx = np.argmin(dists_to_ray)
                 min_dist = dists_to_ray[idx]
-                print(f"Frame {frame_idx} | Detección en ({cx},{cy}) | Distancia mínima al rayo: {min_dist:.3f}")
+                print(f"Frame {frame_idx} | Detection at ({cx},{cy}) | Min distance to ray: {min_dist:.3f}")
                 closest_pt = points[idx].tolist()
                 det['closest_point'] = closest_pt
             else:
@@ -116,7 +178,7 @@ def main():
             results.append(det)
         with open(output_json, 'w') as f:
             json.dump(results, f, indent=2)
-        print(f"detections_3d.json generado correctamente con {len(results)} elementos.")
+        print(f"detections_3d.json generated with {len(results)} elements.")
     else:
         print('No se encontró el archivo de detecciones generado.')
 
