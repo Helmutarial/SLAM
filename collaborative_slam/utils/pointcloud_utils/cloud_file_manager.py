@@ -14,6 +14,7 @@ from collaborative_slam.views.open3d_visualization_classes import Open3DVisualiz
 import spectacularAI
 import os
 import sys
+from collaborative_slam.utils.pointcloud_utils import save_pointclouds_and_poses
 
 def save_pointclouds_and_poses(visu3D, cloud_points_folder, results_folder):
     """
