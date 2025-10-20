@@ -59,10 +59,3 @@ def detect_objects_in_folder(frames_folder, output_folder, model_path='yolov8n.p
     with open(out_path, 'w') as f:
         json.dump(all_detections, f, indent=2)
     print(f'Todas las detecciones guardadas en {out_path}')
-
-def run_yolo_on_frames(frames_dir, detections_json, model_path='yolov8n.pt', classes_of_interest=None):
-    """
-    Wrapper for detect_objects_in_folder to match pipeline usage.
-    """
-    output_folder = os.path.dirname(detections_json)
-    detect_objects_in_folder(frames_dir, output_folder, model_path, classes_of_interest)
