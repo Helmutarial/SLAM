@@ -1,0 +1,66 @@
+"""
+Función para visualizar el plan 2D acumulado de nubes de puntos, trayectoria y detecciones 3D.
+"""
+# Imports
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+
+def visualize_planview(clean_points, clean_z, clustered_detections, trajectory, class_colors, wall_lines):
+    """
+    Visualiza el plan 2D acumulado de nubes de puntos, trayectoria y detecciones 3D.
+    Args:
+        clean_points: np.ndarray, puntos filtrados XY
+        clean_z: np.ndarray, alturas Z
+        clustered_detections: dict, detecciones agrupadas por clase {class_name: [centroid, ...]}
+        trajectory: np.ndarray, trayectoria de la cámara
+        class_colors: dict, colores por clase
+        wall_lines: list, líneas detectadas
+        min_confidence: float, umbral de confianza para mostrar detecciones
+    """
+    
+    fig, ax = plt.subplots(figsize=(10, 8))
+    scatter = ax.scatter(clean_points[:, 0], clean_points[:, 1], s=2, c='gray', alpha=0.2, label='Point cloud')
+    # Detecciones agrupadas por clase
+    if clustered_detections:
+        drawn_classes = set()
+        count_drawn = 0
+        for class_name, centroids in clustered_detections.items():
+            color = class_colors.get(class_name, 'red')
+            for i, centroid in enumerate(centroids):
+                ax.scatter(centroid[0], centroid[1], s=220, c=color, marker='*', edgecolors='black', linewidths=2, label=f'{class_name} (clustered)' if class_name not in drawn_classes else None)
+                drawn_classes.add(class_name)
+                count_drawn += 1
+        print(f"Plotted {count_drawn} clustered detections by class.")
+    # Trayectoria de la cámara
+    if trajectory is not None and trajectory.size > 0:
+        line, = ax.plot([], [], c='orange', lw=2, label='Camera trajectory')
+        start = ax.scatter(trajectory[0, 0], trajectory[0, 1], color='green', s=80, label='Start')
+        end = ax.scatter(trajectory[-1, 0], trajectory[-1, 1], color='red', s=80, label='End')
+        def update(num):
+            line.set_data(trajectory[:num, 0], trajectory[:num, 1])
+            return line,
+        ani = animation.FuncAnimation(fig, update, frames=len(trajectory), interval=60, blit=True, repeat=False)
+        for i in range(0, len(trajectory)-1, max(1, len(trajectory)//20)):
+            ax.arrow(trajectory[i, 0], trajectory[i, 1],
+                    trajectory[i+1, 0] - trajectory[i, 0],
+                    trajectory[i+1, 1] - trajectory[i, 1],
+                    shape='full', lw=0, length_includes_head=True,
+                    head_width=0.15, head_length=0.3, color='orange', alpha=0.7)
+    # Líneas detectadas (paredes)
+    for i, (x_range, y_range) in enumerate(wall_lines):
+        if i == 0:
+            ax.plot(x_range, y_range, c='blue', lw=4, alpha=0.95, label='Detected wall')
+        else:
+            ax.plot(x_range, y_range, c='blue', lw=4, alpha=0.95)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_title('Accumulated 2D plan of point clouds + trajectory + walls + floor + detections')
+    ax.axis('equal')
+    ax.legend()
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.5)
+    ax.set_facecolor('#f5f5f5')
+    try:
+        plt.show()
+    finally:
+        plt.close(fig)
