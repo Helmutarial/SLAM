@@ -8,6 +8,13 @@ import numpy as np
 import os
 import re
 import json
+import sys
+from collaborative_slam.utils import file_utils
+from collaborative_slam.views.open3d_visualization_classes import Open3DVisualization, update_camera_frame_from_vio, update_keyframes_from_mapping
+import spectacularAI
+import os
+import sys
+from collaborative_slam.utils.pointcloud_utils import save_pointclouds_and_poses
 
 def save_pointclouds_and_poses(visu3D, cloud_points_folder, results_folder):
     """
@@ -74,3 +81,30 @@ def load_point_clouds(folder_path):
         except Exception as e:
             print(f"❌ Error loading {filename}: {e}")
     return point_clouds, valid_files
+
+def generate_pointclouds_from_data_folder(data_folder, results_folder):
+    """
+    Generates point clouds and camera poses from a data folder using spectacularAI and depthai.
+    Saves .ply clouds and poses.json in the results folder structure.
+    Replica exact logic from video_to_pointclouds.py, but fully programmatic.
+    """
+    voxelSize = 0
+    cloud_points_folder = os.path.join(results_folder, 'cloud_points')
+    os.makedirs(cloud_points_folder, exist_ok=True)
+    visu3D = Open3DVisualization(voxelSize, False, False, False)
+    def onVioOutput(vioOutput):
+        update_camera_frame_from_vio(vioOutput, visu3D)
+    def onMappingOutput(output):
+        update_keyframes_from_mapping(output, visu3D)
+    print(f"[INFO] Starting replay for {data_folder}")
+    try:
+        replay = spectacularAI.Replay(data_folder, onMappingOutput)
+        replay.setOutputCallback(onVioOutput)
+        replay.startReplay()
+        visu3D.run()
+        replay.close()
+        save_pointclouds_and_poses(visu3D, cloud_points_folder, results_folder)
+        print(f"[INFO] Point clouds and poses saved for {data_folder}")
+    except Exception as e:
+        print(f"[ERROR] Failed to generate point clouds for {data_folder}: {e}")
+        return
