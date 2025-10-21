@@ -14,22 +14,20 @@ from collaborative_slam.utils.file_utils import select_data_folder
 from collaborative_slam.utils.pointcloud_utils import load_point_clouds
 from collaborative_slam.utils.pointcloud_utils.accumulation import merge_point_clouds
 from collaborative_slam.utils.pointcloud_utils.preprocessing import filter_isolated_points, filter_points_by_percentile
-from collaborative_slam.utils.yolo_utils.detection_clustering_utils import cluster_detections_by_class
 from collaborative_slam.utils.trayectory_utils.trajectory_filtering import load_camera_trajectory
-from collaborative_slam.views.visualize_planview import visualize_planview
+from collaborative_slam.views.visualize_planview import plot_planview
 from collaborative_slam.utils.constants import CLASS_COLORS as class_colors
 
 def main():
+
     min_confidence = 0.5  # Confidence threshold
     start_total = time.time()
     print("Selecciona la carpeta de resultados que quieres visualizar...")
     results_folder = select_data_folder()
     cloud_dir = os.path.join(results_folder, 'cloud_points')
     detections_3d_path = os.path.join(results_folder, 'detections_3d.json')
-
-    # Cargar detecciones proyectadas a 3D (si existen)
+    # Cargar solo detecciones proyectadas a 3D por nube
     detections_3d = []
-
     if os.path.exists(detections_3d_path):
         with open(detections_3d_path, 'r') as f:
             detections_3d = json.load(f)
@@ -51,6 +49,10 @@ def main():
         print("No se encontraron nubes de puntos.")
         return
     print(f"Uniendo {len(clouds)} nubes...")
+    print("Correspondencia frame <-> nube de puntos:")
+    for f in files:
+        frame_num = f.split('.')[0]
+        print(f"Frame {frame_num} -> {f}")
     t0 = time.time()
     merged_cloud = merge_point_clouds(clouds)
     print(f"Clouds merged in {time.time() - t0:.2f} s")
@@ -75,12 +77,8 @@ def main():
     poses_path = os.path.join(results_folder, 'poses.json')
     trajectory = load_camera_trajectory(poses_path)
 
-    # Cluster detections by class (antes de visualizar)
-    clustered_detections = None
-    if detections_3d:
-        clustered_detections = cluster_detections_by_class(detections_3d, min_confidence=min_confidence, eps=1.2)
     t0 = time.time()
-    visualize_planview(clean_points, clean_z, clustered_detections, trajectory, class_colors, wall_lines, detections_3d)
+    plot_planview(clean_points, detections_3d, trajectory, wall_lines)
     print(f"Visualización lista en {time.time() - t0:.2f} s")
     print(f"Tiempo total de ejecución: {time.time() - start_total:.2f} s")
 

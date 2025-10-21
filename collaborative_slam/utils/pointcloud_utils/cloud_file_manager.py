@@ -38,6 +38,10 @@ def save_pointclouds_and_poses(visu3D, cloud_points_folder, results_folder):
         filename = os.path.join(cloud_points_folder, f"{id}.ply")
         o3d.io.write_point_cloud(filename, pc.cloud)
         camToWorld = pc.camToWorld
+        # Guardar la matriz camToWorld en JSON
+        camToWorld_path = os.path.join(cloud_points_folder, f"{id}_camToWorld.json")
+        with open(camToWorld_path, "w") as f:
+            json.dump(camToWorld.tolist(), f, indent=2)
         # Eliminado guardado de .npy
         x = float(camToWorld[0, 3])
         y = float(camToWorld[1, 3])
