@@ -33,7 +33,6 @@ def update_camera_frame_from_vio(vioOutput, visu3D):
 
 def update_keyframes_from_mapping(output, visu3D):
     """
-    Update keyframes in the visualization using mapping output.
     Args:
         output: Mapping output object with updated keyframes.
         visu3D: SlamSceneManager instance to update.
@@ -64,9 +63,10 @@ def main():
     # Select data folder interactively
     dataFolder = file_utils.select_data_folder()
 
-    # Crear carpeta results y cloud_points en la raíz del workspace (TFM)
+    # Crear carpeta results y cloud_points en results/<nombre carpeta entrada>/
+    input_folder_name = os.path.basename(os.path.normpath(dataFolder))
     workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-    results_folder = os.path.join(workspace_root, "results")
+    results_folder = os.path.join(workspace_root, "results", input_folder_name)
     cloud_points_folder = os.path.join(results_folder, "cloud_points")
     os.makedirs(results_folder, exist_ok=True)
     os.makedirs(cloud_points_folder, exist_ok=True)

@@ -58,4 +58,3 @@ def detect_objects_in_folder(frames_folder, output_folder, model_path='yolov8n.p
     out_path = os.path.join(output_folder, 'detections.json')
     with open(out_path, 'w') as f:
         json.dump(all_detections, f, indent=2)
-    print(f'Todas las detecciones guardadas en {out_path}')
