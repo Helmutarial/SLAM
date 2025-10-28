@@ -11,8 +11,7 @@ import json
 import numpy as np
 from collaborative_slam.utils.file_utils import select_data_folder
 from collaborative_slam.utils.pointcloud_utils import load_point_clouds
-from collaborative_slam.utils.trayectory_utils.trajectory_filtering import load_camera_traje
-ctory
+from collaborative_slam.utils.trayectory_utils.trajectory_filtering import load_camera_trajectory
 from collaborative_slam.tools.associate_detections_to_depthmap import associate_detections_with_depth
 
 def load_calibration(calib_path):
