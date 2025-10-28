@@ -15,7 +15,7 @@ from collaborative_slam.utils.pointcloud_utils import load_point_clouds
 from collaborative_slam.utils.pointcloud_utils.accumulation import merge_point_clouds
 from collaborative_slam.utils.pointcloud_utils.preprocessing import filter_isolated_points, filter_points_by_percentile
 from collaborative_slam.utils.trayectory_utils.trajectory_filtering import load_camera_trajectory
-from collaborative_slam.views.visualize_planview import plot_planview
+from collaborative_slam.views.visualize_planview import plot_planview, plot_detection_cloud_distance
 from collaborative_slam.utils.constants import CLASS_COLORS as class_colors
 
 def main():
@@ -77,6 +77,8 @@ def main():
 
     t0 = time.time()
     plot_planview(clean_points, detections_3d, trajectory, wall_lines)
+    # Nueva visualización: distancia detección-nube
+    plot_detection_cloud_distance(clean_points, detections_3d, trajectory)
     print(f"Visualización lista en {time.time() - t0:.2f} s")
     print(f"Tiempo total de ejecución: {time.time() - start_total:.2f} s")
 

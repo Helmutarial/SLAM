@@ -46,7 +46,7 @@ def project_detection_to_3d(centroid_2d, cloud, camera_matrix):
     return cloud[idx].tolist()
 
 def main():
-    print("Selecciona la carpeta de resultados...")
+    print("Selecciona la carpeta de entrada...")
     results_folder = select_data_folder()
     detections_path = os.path.join(results_folder, 'detections', 'frames_detected', 'detections.json')
     cloud_dir = os.path.join(results_folder, 'cloud_points')

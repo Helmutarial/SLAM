@@ -1,6 +1,8 @@
+
 import matplotlib.pyplot as plt
 from collaborative_slam.utils.constants import CLASS_COLORS as class_colors
-
+from scipy.spatial import cKDTree
+import numpy as np
 def plot_planview(clean_points, detections_3d, trajectory, wall_lines):
     """
     Plotea el plan XY con la nube de puntos, detecciones 3D y trayectoria.
@@ -102,6 +104,59 @@ def plot_planview(clean_points, detections_3d, trajectory, wall_lines):
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_title('Detecciones 3D por nube de puntos')
+    ax.axis('equal')
+    handles, labels = ax.get_legend_handles_labels()
+    unique = dict()
+    for h, l in zip(handles, labels):
+        if l not in unique:
+            unique[l] = h
+    ax.legend(unique.values(), unique.keys())
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.5)
+    ax.set_facecolor('#f5f5f5')
+    plt.show()
+
+def plot_detection_cloud_distance(clean_points, detections_3d, trajectory):
+    """
+    Plots a new figure associating each detection to the nearest point in the cloud and shows the distance from the camera.
+    Args:
+        clean_points (np.ndarray): Nx2 array of point cloud (XY)
+        detections_3d (list): List of detection dicts with 'frame' and 'class'
+        trajectory (np.ndarray): Mx3 array of camera positions
+    """
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.scatter(clean_points[:, 0], clean_points[:, 1], s=2, c='gray', alpha=0.2, label='Point cloud')
+    if trajectory is None or trajectory.size == 0:
+        print("No camera trajectory available for distance visualization.")
+        return
+    # Build KDTree for fast nearest neighbor search
+    kdtree = cKDTree(clean_points)
+    for det in detections_3d:
+        frame_idx = det.get('frame', None)
+        if frame_idx is None:
+            continue
+        try:
+            idx = int(frame_idx)
+        except Exception:
+            continue
+        if idx < 0 or idx >= len(trajectory):
+            continue
+        cam_pos = trajectory[idx, :2]  # Only XY for plan view
+        # Find nearest point in cloud to detection (projected to XY)
+        # If detection has 3D point, use its XY, else skip
+        if 'point_3d' not in det or det['point_3d'] is None:
+            continue
+        det_xy = np.array(det['point_3d'][:2])
+        dist, nearest_idx = kdtree.query(det_xy)
+        nearest_point = clean_points[nearest_idx]
+        # Draw detection and line from camera to nearest point
+        color = class_colors.get(det['class'], 'red')
+        ax.scatter(nearest_point[0], nearest_point[1], s=90, c=color, marker='D', edgecolors='black', linewidths=1.5, label=f"{det['class']} (cloud NN)")
+        ax.plot([cam_pos[0], nearest_point[0]], [cam_pos[1], nearest_point[1]], c=color, lw=1.5, alpha=0.7, linestyle='-', label=None)
+        # Show distance as text
+        ax.text(nearest_point[0], nearest_point[1], f"{dist:.2f}m", fontsize=9, color='black', ha='left', va='bottom', bbox=dict(facecolor='white', alpha=0.6, edgecolor='none', pad=1))
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_title('Detection to Cloud Distance (Nearest Neighbor)')
     ax.axis('equal')
     handles, labels = ax.get_legend_handles_labels()
     unique = dict()

@@ -63,12 +63,9 @@ def main():
     # Select data folder interactively
     dataFolder = file_utils.select_data_folder()
 
-    # Crear carpeta results y cloud_points en results/<nombre carpeta entrada>/
-    input_folder_name = os.path.basename(os.path.normpath(dataFolder))
-    workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-    results_folder = os.path.join(workspace_root, "results", input_folder_name)
+    # Guardar todo en la carpeta de entrada seleccionada
+    results_folder = dataFolder
     cloud_points_folder = os.path.join(results_folder, "cloud_points")
-    os.makedirs(results_folder, exist_ok=True)
     os.makedirs(cloud_points_folder, exist_ok=True)
     voxelSize = 0
     visu3D = SlamSceneManager(voxelSize, False, False, False)

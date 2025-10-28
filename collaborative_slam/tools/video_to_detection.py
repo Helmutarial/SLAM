@@ -35,9 +35,8 @@ def main():
     video_path = os.path.join(input_folder, "rgb_video.mp4")
     if not os.path.exists(video_path):
         sys.exit(1)
-    folder_name = os.path.basename(os.path.normpath(input_folder))
-    tfm_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-    results_dir = os.path.join(tfm_root, 'results', folder_name)
+    # Guardar todo en la carpeta de entrada seleccionada
+    results_dir = input_folder
     frames_dir = os.path.join(results_dir, 'frames')
     detected_dir = os.path.join(results_dir, 'detections', 'frames_detected')
     os.makedirs(frames_dir, exist_ok=True)
