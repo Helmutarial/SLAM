@@ -34,6 +34,8 @@ def extract_n_equally_spaced_frames(video_path, output_dir, N=None, poses_json_p
     # Determinar extensión del video
     ext = 'jpg'  # Forzar extensión de imagen
     # Calcula los índices equiespaciados, redondeando siempre hacia arriba
+    if N is None:
+        N = total_frames
     raw_indices = np.linspace(0, total_frames - 1, N)
     indices = np.ceil(raw_indices).astype(int)
     indices = np.clip(indices, 0, total_frames - 1)  # Asegura que no se salga del rango

@@ -19,8 +19,6 @@ from collaborative_slam.views.visualize_planview import plot_planview
 from collaborative_slam.utils.constants import CLASS_COLORS as class_colors
 
 def main():
-
-    min_confidence = 0.5  # Confidence threshold
     start_total = time.time()
     print("Selecciona la carpeta de resultados que quieres visualizar...")
     results_folder = select_data_folder()
