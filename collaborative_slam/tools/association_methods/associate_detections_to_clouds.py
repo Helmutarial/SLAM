@@ -12,7 +12,7 @@ import numpy as np
 from collaborative_slam.utils.file_utils import select_data_folder
 from collaborative_slam.utils.pointcloud_utils import load_point_clouds
 from collaborative_slam.utils.trayectory_utils.trajectory_filtering import load_camera_trajectory
-from collaborative_slam.tools.associate_detections_to_depthmap import associate_detections_with_depth
+from collaborative_slam.tools.association_methods.associate_detections_to_depthmap import associate_detections_with_depth
 
 def load_calibration(calib_path):
     """
