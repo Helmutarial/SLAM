@@ -19,68 +19,83 @@ from collaborative_slam.views.visualize_planview import plot_planview, plot_dete
 from collaborative_slam.utils.constants import CLASS_COLORS as class_colors
 
 def main():
-    start_total = time.time()
-    print("Selecciona la carpeta de resultados que quieres visualizar...")
-    results_folder = select_data_folder()
-    cloud_dir = os.path.join(results_folder, 'cloud_points')
-    detections_3d_path = os.path.join(results_folder, 'detections_3d.json')
-    # Cargar solo detecciones proyectadas a 3D por nube
-    detections_3d = []
-    if os.path.exists(detections_3d_path):
-        with open(detections_3d_path, 'r') as f:
-            detections_3d = json.load(f)
-        print('Matching video frame (detection) <-> pose frame:')
-        for i, det in enumerate(detections_3d):
-            frame_video = det.get('frame', i)
-            frame_pose = det.get('pose', None)
-            print(f'Detection {i}: frame_video={frame_video} <-> pose frame={frame_pose}')
 
-    # Importar colores de clases desde constants
-
-    wall_lines = []
-
-    print(f"Cargando nubes de puntos desde: {cloud_dir}")
-    t0 = time.time()
-    clouds, files = load_point_clouds(cloud_dir)
-    print(f"Nubes de puntos cargadas en {time.time() - t0:.2f} s")
-    if not clouds:
-        print("No se encontraron nubes de puntos.")
-        return
-    print(f"Uniendo {len(clouds)} nubes...")
-    print("Correspondencia frame <-> nube de puntos:")
-    for f in files:
-        frame_num = f.split('.')[0]
-        print(f"Frame {frame_num} -> {f}")
-    t0 = time.time()
-    merged_cloud = merge_point_clouds(clouds)
-    print(f"Clouds merged in {time.time() - t0:.2f} s")
-    points = np.asarray(merged_cloud.points)
-    if points.size == 0:
-        print("Merged cloud is empty.")
-        return
-    # Project to X-Y plane and get Z
-    points_xy = points[:, :2]
-    points_z = points[:, 2]
-
-    # Filter: limit X/Y range to center visualization
-    filtered_points, filtered_z = filter_points_by_percentile(points_xy, points_z, x_percentile=[2,98], y_percentile=[2,98])
-
-    # Noise filtering: remove isolated points
-    t0 = time.time()
-    clean_points, clean_z = filter_isolated_points(filtered_points, filtered_z, percentile=90, n_neighbors=6)
-    print(f"Noise filtering done in {time.time() - t0:.2f} s")
-
-
-    # Cargar trayectoria de la cámara
-    poses_path = os.path.join(results_folder, 'poses.json')
-    trajectory = load_camera_trajectory(poses_path)
-
-    t0 = time.time()
-    plot_planview(clean_points, detections_3d, trajectory, wall_lines)
-    # Nueva visualización: distancia detección-nube
-    plot_detection_cloud_distance(clean_points, detections_3d, trajectory)
-    print(f"Visualización lista en {time.time() - t0:.2f} s")
     print(f"Tiempo total de ejecución: {time.time() - start_total:.2f} s")
+        """
+        Applies a 4x4 transformation matrix to a trajectory (Nx2 or Nx3).
+        Returns Nx2 array.
+        """
+        if traj is None or traj.size == 0:
+            return traj
+        if traj.shape[1] == 2:
+            traj_h = np.hstack([traj, np.zeros((traj.shape[0], 1)), np.ones((traj.shape[0], 1))])
+        else:
+            traj_h = np.hstack([traj, np.ones((traj.shape[0], 1))])
+        traj_t = (T @ traj_h.T).T
+        return traj_t[:, :2]
+
+    def main(transformation_matrix=None):
+        start_total = time.time()
+        print("Selecciona la carpeta de resultados que quieres visualizar...")
+        results_folder = select_data_folder()
+        cloud_dir = os.path.join(results_folder, 'cloud_points')
+        detections_3d_path = os.path.join(results_folder, 'detections_3d.json')
+        # Cargar solo detecciones proyectadas a 3D por nube
+        detections_3d = []
+        if os.path.exists(detections_3d_path):
+            with open(detections_3d_path, 'r') as f:
+                detections_3d = json.load(f)
+            print('Matching video frame (detection) <-> pose frame:')
+            for i, det in enumerate(detections_3d):
+                frame_video = det.get('frame', i)
+                frame_pose = det.get('pose', None)
+                print(f'Detection {i}: frame_video={frame_video} <-> pose frame={frame_pose}')
+
+        wall_lines = []
+
+        print(f"Cargando nubes de puntos desde: {cloud_dir}")
+        t0 = time.time()
+        clouds, files = load_point_clouds(cloud_dir)
+        print(f"Nubes de puntos cargadas en {time.time() - t0:.2f} s")
+        if not clouds:
+            print("No se encontraron nubes de puntos.")
+            return
+        print(f"Uniendo {len(clouds)} nubes...")
+        print("Correspondencia frame <-> nube de puntos:")
+        for f in files:
+            frame_num = f.split('.')[0]
+            print(f"Frame {frame_num} -> {f}")
+        t0 = time.time()
+        merged_cloud = merge_point_clouds(clouds)
+        print(f"Clouds merged in {time.time() - t0:.2f} s")
+        points = np.asarray(merged_cloud.points)
+        if points.size == 0:
+            print("Merged cloud is empty.")
+            return
+        # Project to X-Y plane and get Z
+        points_xy = points[:, :2]
+        points_z = points[:, 2]
+
+        # Filter: limit X/Y range to center visualization
+        filtered_points, filtered_z = filter_points_by_percentile(points_xy, points_z, x_percentile=[2,98], y_percentile=[2,98])
+
+        # Noise filtering: remove isolated points
+        t0 = time.time()
+        clean_points, clean_z = filter_isolated_points(filtered_points, filtered_z, percentile=90, n_neighbors=6)
+        print(f"Noise filtering done in {time.time() - t0:.2f} s")
+
+        # Cargar trayectoria de la cámara
+        poses_path = os.path.join(results_folder, 'poses.json')
+        trajectory = load_camera_trajectory(poses_path)
+
+        # Si se proporciona una matriz de transformación, alinear la trayectoria
+        if transformation_matrix is not None and trajectory is not None and trajectory.size > 0:
+            trajectory = transform_traj(trajectory, transformation_matrix)
+
+        t0 = time.time()
+        plot_planview(clean_points, detections_3d, trajectory, wall_lines)
+        # Nueva visualización: distancia detección-nube
+        plot_detection_cloud_distance(clean_points, detections_3d, trajectory)
 
 if __name__ == "__main__":
     main()
