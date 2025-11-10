@@ -5,3 +5,8 @@ depthai
 numpy
 opencv-python
 ultralytics
+torch
+visdom
+h5py
+scikit-learn
+tqdm

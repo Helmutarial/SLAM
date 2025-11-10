@@ -1,0 +1,3 @@
+[submodule "collaborative_slam/external/USIP"]
+	path = collaborative_slam/external/USIP
+	url = https://github.com/lijx10/USIP
