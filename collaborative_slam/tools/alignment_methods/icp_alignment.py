@@ -7,11 +7,12 @@ All code and comments in English.
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from collaborative_slam.views.planview_visualization import visualize_planview
 import open3d as o3d
 import json
 from collaborative_slam.utils.pointcloud_utils import load_point_clouds
 from collaborative_slam.utils.pointcloud_utils.accumulation import merge_point_clouds
-from collaborative_slam.utils.pointcloud_utils.alignment import compute_icp_rmse
+from collaborative_slam.utils.pointcloud_utils.alignment import compute_icp_rmse, transform_trajectory
 from collaborative_slam.utils.file_utils import select_data_folder
 
 def load_trajectory(poses_path):
@@ -39,19 +40,6 @@ def load_detections(detections_path, min_conf=0.6):
             det_by_class.setdefault(d['class'], []).append(np.array(d['point_3d']))
     return det_by_class
 
-def transform_traj(traj, T):
-    """
-    Apply a 4x4 transformation matrix to a trajectory (Nx2 or Nx3).
-    Returns Nx2 array.
-    """
-    if traj is None or traj.size == 0:
-        return traj
-    if traj.shape[1] == 2:
-        traj_h = np.hstack([traj, np.zeros((traj.shape[0], 1)), np.ones((traj.shape[0], 1))])
-    else:
-        traj_h = np.hstack([traj, np.ones((traj.shape[0], 1))])
-    traj_t = (T @ traj_h.T).T
-    return traj_t[:, :2]
 
 def align_by_detections(det1, det2):
     """
@@ -141,48 +129,30 @@ def main():
     print('Aligning with ICP only...')
     rmse_icp, t_icp = compute_icp_rmse(merged2_icp, merged1, np.eye(4))
     merged2_icp.transform(t_icp)
-    pts1_vis, pts1_z_vis, pts2_vis, pts2_z_vis, x_min, x_max, y_min, y_max = prepare_clouds(merged1, merged2_icp)
-    fig, ax = plt.subplots(figsize=(11, 9))
-    sc1 = ax.scatter(pts1_vis[:, 0], pts1_vis[:, 1], s=3, c=pts1_z_vis, cmap='Blues', alpha=0.18, label='Cloud 1')
-    sc2 = ax.scatter(pts2_vis[:, 0], pts2_vis[:, 1], s=3, c=pts2_z_vis, cmap='Reds', alpha=0.18, label='Cloud 2 ICP')
-    plt.colorbar(sc1, ax=ax, fraction=0.03, pad=0.02, label='Z height Cloud 1')
-    plt.colorbar(sc2, ax=ax, fraction=0.03, pad=0.04, label='Z height Cloud 2')
-    if traj1 is not None and traj1.size > 0:
-        ax.plot(traj1[:, 0], traj1[:, 1], c='orange', lw=3, label='Trajectory 1')
-    if traj2 is not None and traj2.size > 0:
-        traj2_icp = transform_traj(traj2, t_icp)
-        ax.plot(traj2_icp[:, 0], traj2_icp[:, 1], c='black', lw=3, label='Trajectory 2 ICP')
-    ax.set_xlim(x_min, x_max)
-    ax.set_ylim(y_min, y_max)
-    ax.set_title('ICP only')
-    ax.axis('equal')
-    ax.legend(loc='upper right', fontsize=11)
-    plt.tight_layout()
-    plt.show()
+    pts1 = np.asarray(merged1.points)
+    pts2 = np.asarray(merged2_icp.points)
+    traj2_icp = transform_trajectory(traj2, t_icp) if traj2 is not None and traj2.size > 0 else None
+    visualize_planview(
+        pts1, pts2, traj1, traj2_icp,
+        label1='Cloud 1', label2='Cloud 2 ICP',
+        traj_color1='orange', traj_color2='black',
+        title='ICP only'
+    )
 
     # 2. Only detections
     merged2_det = merge_point_clouds(clouds2) # fresh copy
     print('Aligning with detections only...')
     t_det = align_by_detections(det1, det2)
     merged2_det.transform(t_det)
-    pts1_vis, pts1_z_vis, pts2_vis, pts2_z_vis, x_min, x_max, y_min, y_max = prepare_clouds(merged1, merged2_det)
-    fig, ax = plt.subplots(figsize=(11, 9))
-    sc1 = ax.scatter(pts1_vis[:, 0], pts1_vis[:, 1], s=3, c=pts1_z_vis, cmap='Blues', alpha=0.18, label='Cloud 1')
-    sc2 = ax.scatter(pts2_vis[:, 0], pts2_vis[:, 1], s=3, c=pts2_z_vis, cmap='Reds', alpha=0.18, label='Cloud 2 detections')
-    plt.colorbar(sc1, ax=ax, fraction=0.03, pad=0.02, label='Z height Cloud 1')
-    plt.colorbar(sc2, ax=ax, fraction=0.03, pad=0.04, label='Z height Cloud 2')
-    if traj1 is not None and traj1.size > 0:
-        ax.plot(traj1[:, 0], traj1[:, 1], c='orange', lw=3, label='Trajectory 1')
-    if traj2 is not None and traj2.size > 0:
-        traj2_det = transform_traj(traj2, t_det)
-        ax.plot(traj2_det[:, 0], traj2_det[:, 1], c='black', lw=3, label='Trajectory 2 detections')
-    ax.set_xlim(x_min, x_max)
-    ax.set_ylim(y_min, y_max)
-    ax.set_title('Detections only')
-    ax.axis('equal')
-    ax.legend(loc='upper right', fontsize=11)
-    plt.tight_layout()
-    plt.show()
+    pts1 = np.asarray(merged1.points)
+    pts2 = np.asarray(merged2_det.points)
+    traj2_det = transform_trajectory(traj2, t_det) if traj2 is not None and traj2.size > 0 else None
+    visualize_planview(
+        pts1, pts2, traj1, traj2_det,
+        label1='Cloud 1', label2='Cloud 2 detections',
+        traj_color1='orange', traj_color2='black',
+        title='Detections only'
+    )
 
     # 3. Combined (detections + ICP)
     merged2_comb = merge_point_clouds(clouds2) # fresh copy
@@ -192,24 +162,15 @@ def main():
     rmse_comb, t_icp_comb = compute_icp_rmse(merged2_comb, merged1, np.eye(4))
     t_total = t_icp_comb @ t_total
     merged2_comb.transform(t_icp_comb)
-    pts1_vis, pts1_z_vis, pts2_vis, pts2_z_vis, x_min, x_max, y_min, y_max = prepare_clouds(merged1, merged2_comb)
-    fig, ax = plt.subplots(figsize=(11, 9))
-    sc1 = ax.scatter(pts1_vis[:, 0], pts1_vis[:, 1], s=3, c=pts1_z_vis, cmap='Blues', alpha=0.18, label='Cloud 1')
-    sc2 = ax.scatter(pts2_vis[:, 0], pts2_vis[:, 1], s=3, c=pts2_z_vis, cmap='Reds', alpha=0.18, label='Cloud 2 det+ICP')
-    plt.colorbar(sc1, ax=ax, fraction=0.03, pad=0.02, label='Z height Cloud 1')
-    plt.colorbar(sc2, ax=ax, fraction=0.03, pad=0.04, label='Z height Cloud 2')
-    if traj1 is not None and traj1.size > 0:
-        ax.plot(traj1[:, 0], traj1[:, 1], c='orange', lw=3, label='Trajectory 1')
-    if traj2 is not None and traj2.size > 0:
-        traj2_comb = transform_traj(traj2, t_total)
-        ax.plot(traj2_comb[:, 0], traj2_comb[:, 1], c='black', lw=3, label='Trajectory 2 det+ICP')
-    ax.set_xlim(x_min, x_max)
-    ax.set_ylim(y_min, y_max)
-    ax.set_title('Detections + ICP')
-    ax.axis('equal')
-    ax.legend(loc='upper right', fontsize=11)
-    plt.tight_layout()
-    plt.show()
+    pts1 = np.asarray(merged1.points)
+    pts2 = np.asarray(merged2_comb.points)
+    traj2_comb = transform_trajectory(traj2, t_total) if traj2 is not None and traj2.size > 0 else None
+    visualize_planview(
+        pts1, pts2, traj1, traj2_comb,
+        label1='Cloud 1', label2='Cloud 2 det+ICP',
+        traj_color1='orange', traj_color2='black',
+        title='Detections + ICP'
+    )
 
 if __name__ == "__main__":
     main()

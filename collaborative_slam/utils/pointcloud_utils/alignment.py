@@ -1,3 +1,5 @@
+import numpy as np
+
 """
 Alignment & Registration
 
@@ -50,3 +52,21 @@ def compute_icp_rmse(source, target, initial_transform):
         o3d.pipelines.registration.TransformationEstimationPointToPoint()
     )
     return icp_result.inlier_rmse, icp_result.transformation
+
+def transform_trajectory(traj, T):
+    """
+    Apply a 4x4 transformation matrix to a trajectory (Nx2 o Nx3).
+    Args:
+        traj (np.ndarray): Trayectoria original (Nx2 o Nx3)
+        T (np.ndarray): Matriz de transformación 4x4
+    Returns:
+        np.ndarray: Trayectoria transformada (Nx2 o Nx3)
+    """
+    if traj is None or len(traj) == 0:
+        return traj
+    if traj.shape[1] == 2:
+        traj_h = np.hstack([traj, np.zeros((traj.shape[0], 1)), np.ones((traj.shape[0], 1))])
+    else:
+        traj_h = np.hstack([traj, np.ones((traj.shape[0], 1))])
+    traj_t = (T @ traj_h.T).T
+    return traj_t[:, :2] if traj.shape[1] == 2 else traj_t[:, :3]
