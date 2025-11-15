@@ -40,6 +40,21 @@ def load_detections(detections_path, min_conf=0.6):
             det_by_class.setdefault(d['class'], []).append(np.array(d['point_3d']))
     return det_by_class
 
+def load_all_keypoints_from_dir(keypoints_dir):
+    """
+    Load all keypoints from .npz files in a directory and return as a single (N,3) numpy array.
+    """
+    import glob
+    import numpy as np
+    all_points = []
+    npz_files = sorted(glob.glob(os.path.join(keypoints_dir, 'keypoints_*.npz')))
+    for f in npz_files:
+        npz = np.load(f)
+        if 'keypoints_camera' in npz:
+            all_points.append(npz['keypoints_camera'])
+    if not all_points:
+        return np.zeros((0, 3))
+    return np.vstack(all_points)
 
 def align_by_detections(det1, det2):
     """
@@ -85,7 +100,9 @@ def main():
     det_path2 = os.path.join(folder2, 'detections_3d.json')
     cloud_dir1 = os.path.join(folder1, 'cloud_points')
     cloud_dir2 = os.path.join(folder2, 'cloud_points')
-
+    keypoints_dir1 = os.path.join(folder1, 'keypoints')
+    keypoints_dir2 = os.path.join(folder2, 'keypoints')
+    
     # Load data
     traj1 = load_trajectory(poses_path1)
     traj2 = load_trajectory(poses_path2)
@@ -93,37 +110,15 @@ def main():
     det2 = load_detections(det_path2, min_conf=0.6)
     clouds1, _ = load_point_clouds(cloud_dir1)
     clouds2, _ = load_point_clouds(cloud_dir2)
-    if not clouds1 or not clouds2:
-        print('No clouds found in one of the folders.')
-        return
     merged1 = merge_point_clouds(clouds1)
     merged2 = merge_point_clouds(clouds2)
-
-
-    # Helper for subsampling and centering
-    def prepare_clouds(merged1, merged2):
-        def filter_points(points, z, max_points=8000):
-            if points.shape[0] > max_points:
-                idx = np.random.choice(points.shape[0], max_points, replace=False)
-                return points[idx], z[idx]
-            return points, z
-        pts1 = np.asarray(merged1.points)
-        pts2 = np.asarray(merged2.points)
-        pts1_z = pts1[:, 2]
-        pts2_z = pts2[:, 2]
-        pts1_vis, pts1_z_vis = filter_points(pts1, pts1_z)
-        pts2_vis, pts2_z_vis = filter_points(pts2, pts2_z)
-        all_xy = np.vstack([pts1_vis[:, :2], pts2_vis[:, :2]])
-        x_min, x_max = np.percentile(all_xy[:, 0], [2, 98])
-        y_min, y_max = np.percentile(all_xy[:, 1], [2, 98])
-        def mask_range(points):
-            return (points[:, 0] >= x_min) & (points[:, 0] <= x_max) & (points[:, 1] >= y_min) & (points[:, 1] <= y_max)
-        mask1 = mask_range(pts1_vis)
-        mask2 = mask_range(pts2_vis)
-        pts1_vis, pts1_z_vis = pts1_vis[mask1], pts1_z_vis[mask1]
-        pts2_vis, pts2_z_vis = pts2_vis[mask2], pts2_z_vis[mask2]
-        return pts1_vis, pts1_z_vis, pts2_vis, pts2_z_vis, x_min, x_max, y_min, y_max
-
+    kps1 = load_all_keypoints_from_dir(keypoints_dir1)
+    kps2 = load_all_keypoints_from_dir(keypoints_dir2)
+    kpcloud1 = o3d.geometry.PointCloud()
+    kpcloud2 = o3d.geometry.PointCloud()
+    kpcloud1.points = o3d.utility.Vector3dVector(kps1)
+    kpcloud2.points = o3d.utility.Vector3dVector(kps2)
+    
     # 1. Only ICP
     merged2_icp = merge_point_clouds(clouds2) # fresh copy
     print('Aligning with ICP only...')
@@ -172,5 +167,63 @@ def main():
         title='Detections + ICP'
     )
 
+    # Paso 4: alineamiento ICP de los keypoints y visualización
+    if len(kpcloud1.points) > 10 and len(kpcloud2.points) > 10:
+        print('Aligning keypoints clouds with ICP...')
+        kpcloud2_icp = o3d.geometry.PointCloud(kpcloud2)
+        rmse_kp, t_kp = compute_icp_rmse(kpcloud2_icp, kpcloud1, np.eye(4))
+        kpcloud2_icp.transform(t_kp)
+        pts1 = np.asarray(kpcloud1.points)
+        pts2 = np.asarray(kpcloud2_icp.points)
+        traj2_kp = transform_trajectory(traj2, t_kp) if traj2 is not None and traj2.size > 0 else None
+        visualize_planview(
+            pts1, pts2, traj1, traj2_kp,
+            label1='Keypoints 1', label2='Keypoints 2 ICP',
+            traj_color1='orange', traj_color2='blue',
+            title='ICP with USIP keypoints (global)'
+        )
+    else:
+        print('No keypoints found or too few for ICP alignment.')
+
+
+    # Paso 5: alinear keypoints usando la transformación de detecciones (como en el paso 2)
+    if len(kpcloud1.points) > 10 and len(kpcloud2.points) > 10:
+        print('Aligning keypoints clouds with detections only...')
+        t_det_kp = align_by_detections(det1, det2)
+        kpcloud2_det = o3d.geometry.PointCloud(kpcloud2)
+        kpcloud2_det.transform(t_det_kp)
+        pts1 = np.asarray(kpcloud1.points)
+        pts2 = np.asarray(kpcloud2_det.points)
+        traj2_kp_det = transform_trajectory(traj2, t_det_kp) if traj2 is not None and traj2.size > 0 else None
+        visualize_planview(
+            pts1, pts2, traj1, traj2_kp_det,
+            label1='Keypoints 1', label2='Keypoints 2 detections',
+            traj_color1='orange', traj_color2='blue',
+            title='Keypoints: detections only'
+        )
+    else:
+        print('No keypoints found or too few for detections alignment.')
+
+    # Paso 6: alinear keypoints primero con detecciones y luego con ICP (combinado)
+    if len(kpcloud1.points) > 10 and len(kpcloud2.points) > 10:
+        print('Aligning keypoints clouds with detections + ICP...')
+        t_det_kp = align_by_detections(det1, det2)
+        kpcloud2_comb = o3d.geometry.PointCloud(kpcloud2)
+        kpcloud2_comb.transform(t_det_kp)
+        rmse_comb_kp, t_icp_comb_kp = compute_icp_rmse(kpcloud2_comb, kpcloud1, np.eye(4))
+        t_total_kp = t_icp_comb_kp @ t_det_kp
+        kpcloud2_comb.transform(t_icp_comb_kp)
+        pts1 = np.asarray(kpcloud1.points)
+        pts2 = np.asarray(kpcloud2_comb.points)
+        traj2_kp_comb = transform_trajectory(traj2, t_total_kp) if traj2 is not None and traj2.size > 0 else None
+        visualize_planview(
+            pts1, pts2, traj1, traj2_kp_comb,
+            label1='Keypoints 1', label2='Keypoints 2 det+ICP',
+            traj_color1='orange', traj_color2='blue',
+            title='Keypoints: detections + ICP'
+        )
+    else:
+        print('No keypoints found or too few for detections+ICP alignment.')
+        
 if __name__ == "__main__":
     main()

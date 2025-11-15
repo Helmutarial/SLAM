@@ -1,3 +1,5 @@
+# Ignorar la carpeta USIP externa
+collaborative_slam/external/USIP/
 # Ignore Python cache and build files
 __pycache__/
 *.pyc
