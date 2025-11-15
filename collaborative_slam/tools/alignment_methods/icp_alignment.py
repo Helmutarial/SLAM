@@ -1,3 +1,22 @@
+def quick_planview_plot(pts1, pts2, traj1=None, traj2=None, label1='Cloud 1', label2='Cloud 2', traj_color1='orange', traj_color2='black', title='Planview'):
+    """
+    Quick 2D visualization of two point sets and their trajectories using Matplotlib.
+    """
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(8, 8))
+    if pts1 is not None and len(pts1) > 0:
+        plt.scatter(pts1[:, 0], pts1[:, 1], s=1, c='red', label=label1, alpha=0.5)
+    if pts2 is not None and len(pts2) > 0:
+        plt.scatter(pts2[:, 0], pts2[:, 1], s=1, c='blue', label=label2, alpha=0.5)
+    if traj1 is not None and len(traj1) > 0:
+        plt.plot(traj1[:, 0], traj1[:, 1], color=traj_color1, label=label1 + ' traj', linewidth=2)
+    if traj2 is not None and len(traj2) > 0:
+        plt.plot(traj2[:, 0], traj2[:, 1], color=traj_color2, label=label2 + ' traj', linewidth=2)
+    plt.legend()
+    plt.title(title)
+    plt.axis('equal')
+    plt.grid(True)
+    plt.show()
 """
 Script to align and visualize two SLAM point clouds and their trajectories in 2D (plan view).
 Alignment: detections (SVD) + ICP. Only the final visualization is shown, with subsampled clouds and aligned trajectories.
@@ -89,7 +108,20 @@ def align_by_detections(det1, det2):
     T[:3, 3] = t
     return T
 
+
+# --- Evaluation summary ---
+def trajectory_rmse(trajA, trajB):
+    """
+    Compute RMSE between two trajectories (Nx2 arrays). Assumes same length and correspondence.
+    """
+    if trajA is None or trajB is None or len(trajA) != len(trajB) or len(trajA) == 0:
+        return None
+    return np.sqrt(np.mean(np.sum((trajA - trajB) ** 2, axis=1)))
+
 def main():
+    # Cambia a True para usar solo visualización rápida 2D (matplotlib)
+    quick_plot = False
+
     print("Select the first folder (video 1)...")
     folder1 = select_data_folder()
     print("Select the second folder (video 2)...")
@@ -127,12 +159,15 @@ def main():
     pts1 = np.asarray(merged1.points)
     pts2 = np.asarray(merged2_icp.points)
     traj2_icp = transform_trajectory(traj2, t_icp) if traj2 is not None and traj2.size > 0 else None
-    visualize_planview(
-        pts1, pts2, traj1, traj2_icp,
-        label1='Cloud 1', label2='Cloud 2 ICP',
-        traj_color1='orange', traj_color2='black',
-        title='ICP only'
-    )
+    if quick_plot:
+        quick_planview_plot(pts1, pts2, traj1, traj2_icp, label1='Cloud 1', label2='Cloud 2 ICP', traj_color1='orange', traj_color2='black', title='ICP only')
+    else:
+        visualize_planview(
+            pts1, pts2, traj1, traj2_icp,
+            label1='Cloud 1', label2='Cloud 2 ICP',
+            traj_color1='orange', traj_color2='black',
+            title='ICP only'
+        )
 
     # 2. Only detections
     merged2_det = merge_point_clouds(clouds2) # fresh copy
@@ -142,12 +177,15 @@ def main():
     pts1 = np.asarray(merged1.points)
     pts2 = np.asarray(merged2_det.points)
     traj2_det = transform_trajectory(traj2, t_det) if traj2 is not None and traj2.size > 0 else None
-    visualize_planview(
-        pts1, pts2, traj1, traj2_det,
-        label1='Cloud 1', label2='Cloud 2 detections',
-        traj_color1='orange', traj_color2='black',
-        title='Detections only'
-    )
+    if quick_plot:
+        quick_planview_plot(pts1, pts2, traj1, traj2_det, label1='Cloud 1', label2='Cloud 2 detections', traj_color1='orange', traj_color2='black', title='Detections only')
+    else:
+        visualize_planview(
+            pts1, pts2, traj1, traj2_det,
+            label1='Cloud 1', label2='Cloud 2 detections',
+            traj_color1='orange', traj_color2='black',
+            title='Detections only'
+        )
 
     # 3. Combined (detections + ICP)
     merged2_comb = merge_point_clouds(clouds2) # fresh copy
@@ -160,12 +198,15 @@ def main():
     pts1 = np.asarray(merged1.points)
     pts2 = np.asarray(merged2_comb.points)
     traj2_comb = transform_trajectory(traj2, t_total) if traj2 is not None and traj2.size > 0 else None
-    visualize_planview(
-        pts1, pts2, traj1, traj2_comb,
-        label1='Cloud 1', label2='Cloud 2 det+ICP',
-        traj_color1='orange', traj_color2='black',
-        title='Detections + ICP'
-    )
+    if quick_plot:
+        quick_planview_plot(pts1, pts2, traj1, traj2_comb, label1='Cloud 1', label2='Cloud 2 det+ICP', traj_color1='orange', traj_color2='black', title='Detections + ICP')
+    else:
+        visualize_planview(
+            pts1, pts2, traj1, traj2_comb,
+            label1='Cloud 1', label2='Cloud 2 det+ICP',
+            traj_color1='orange', traj_color2='black',
+            title='Detections + ICP'
+        )
 
     # Paso 4: alineamiento ICP de los keypoints y visualización
     if len(kpcloud1.points) > 10 and len(kpcloud2.points) > 10:
@@ -176,12 +217,15 @@ def main():
         pts1 = np.asarray(kpcloud1.points)
         pts2 = np.asarray(kpcloud2_icp.points)
         traj2_kp = transform_trajectory(traj2, t_kp) if traj2 is not None and traj2.size > 0 else None
-        visualize_planview(
-            pts1, pts2, traj1, traj2_kp,
-            label1='Keypoints 1', label2='Keypoints 2 ICP',
-            traj_color1='orange', traj_color2='blue',
-            title='ICP with USIP keypoints (global)'
-        )
+        if quick_plot:
+            quick_planview_plot(pts1, pts2, traj1, traj2_kp, label1='Keypoints 1', label2='Keypoints 2 ICP', traj_color1='orange', traj_color2='blue', title='ICP with USIP keypoints (global)')
+        else:
+            visualize_planview(
+                pts1, pts2, traj1, traj2_kp,
+                label1='Keypoints 1', label2='Keypoints 2 ICP',
+                traj_color1='orange', traj_color2='blue',
+                title='ICP with USIP keypoints (global)'
+            )
     else:
         print('No keypoints found or too few for ICP alignment.')
 
@@ -195,12 +239,15 @@ def main():
         pts1 = np.asarray(kpcloud1.points)
         pts2 = np.asarray(kpcloud2_det.points)
         traj2_kp_det = transform_trajectory(traj2, t_det_kp) if traj2 is not None and traj2.size > 0 else None
-        visualize_planview(
-            pts1, pts2, traj1, traj2_kp_det,
-            label1='Keypoints 1', label2='Keypoints 2 detections',
-            traj_color1='orange', traj_color2='blue',
-            title='Keypoints: detections only'
-        )
+        if quick_plot:
+            quick_planview_plot(pts1, pts2, traj1, traj2_kp_det, label1='Keypoints 1', label2='Keypoints 2 detections', traj_color1='orange', traj_color2='blue', title='Keypoints: detections only')
+        else:
+            visualize_planview(
+                pts1, pts2, traj1, traj2_kp_det,
+                label1='Keypoints 1', label2='Keypoints 2 detections',
+                traj_color1='orange', traj_color2='blue',
+                title='Keypoints: detections only'
+            )
     else:
         print('No keypoints found or too few for detections alignment.')
 
@@ -216,14 +263,48 @@ def main():
         pts1 = np.asarray(kpcloud1.points)
         pts2 = np.asarray(kpcloud2_comb.points)
         traj2_kp_comb = transform_trajectory(traj2, t_total_kp) if traj2 is not None and traj2.size > 0 else None
-        visualize_planview(
-            pts1, pts2, traj1, traj2_kp_comb,
-            label1='Keypoints 1', label2='Keypoints 2 det+ICP',
-            traj_color1='orange', traj_color2='blue',
-            title='Keypoints: detections + ICP'
-        )
+        if quick_plot:
+            quick_planview_plot(pts1, pts2, traj1, traj2_kp_comb, label1='Keypoints 1', label2='Keypoints 2 det+ICP', traj_color1='orange', traj_color2='blue', title='Keypoints: detections + ICP')
+        else:
+            visualize_planview(
+                pts1, pts2, traj1, traj2_kp_comb,
+                label1='Keypoints 1', label2='Keypoints 2 det+ICP',
+                traj_color1='orange', traj_color2='blue',
+                title='Keypoints: detections + ICP'
+            )
     else:
         print('No keypoints found or too few for detections+ICP alignment.')
         
-if __name__ == "__main__":
-    main()
+
+    print("\n--- ALIGNMENT EVALUATION SUMMARY ---")
+    # 1. ICP only
+    print(f"[ICP only] RMSE: {rmse_icp:.4f}", end='')
+    if traj2_icp is not None and traj1 is not None:
+        rmse_traj_icp = trajectory_rmse(traj1, traj2_icp)
+        if rmse_traj_icp is not None:
+            print(f", Trajectory RMSE: {rmse_traj_icp:.4f}")
+        else:
+            print(", Trajectory RMSE: N/A")
+    else:
+        print()
+    # 2. Detections only
+    print(f"[Detections only] Trajectory RMSE: ", end='')
+    if traj2_det is not None and traj1 is not None:
+        rmse_traj_det = trajectory_rmse(traj1, traj2_det)
+        if rmse_traj_det is not None:
+            print(f"{rmse_traj_det:.4f}")
+        else:
+            print("N/A")
+    else:
+        print("N/A")
+    # 3. Detections + ICP
+    print(f"[Detections+ICP] RMSE: {rmse_comb:.4f}", end='')
+    if traj2_comb is not None and traj1 is not None:
+        print("\n--- ALIGNMENT EVALUATION SUMMARY ---")
+        print(f"[ICP only] RMSE: {rmse_icp:.4f}")
+        print(f"[Detections+ICP] RMSE: {rmse_comb:.4f}")
+        if 'rmse_kp' in locals():
+            print(f"[Keypoints ICP] RMSE: {rmse_kp:.4f}")
+        if 'rmse_comb_kp' in locals():
+            print(f"[Keypoints det+ICP] RMSE: {rmse_comb_kp:.4f}")
+    # 4. Keypoints ICP
